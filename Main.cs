@@ -6,7 +6,7 @@ using System.Text;
 using System.Data;
 using System.ComponentModel;
 using Terraria;
-using Hooks;
+using TerrariaApi.Server;
 using TShockAPI;
 using TShockAPI.DB;
 using Mono.Data.Sqlite;
@@ -15,7 +15,7 @@ using Newtonsoft.Json;
 
 namespace ChatAssistant
 {
-    [APIVersion(1, 16)]
+    [ApiVersion(1, 16)]
     public class CAMain : TerrariaPlugin
     {        
 
@@ -93,11 +93,11 @@ namespace ChatAssistant
         }
         public override void Initialize()
         {
-            NetHooks.GetData += GetData;
-            NetHooks.SendData += SendData;
-            ServerHooks.Join += OnJoin;
-            ServerHooks.Leave += OnLeave;
-            ServerHooks.Chat += OnChat;
+            ServerApi.Hooks.ServerJoin.Register(this, OnJoin);
+            ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
+            ServerApi.Hooks.NetGetData.Register(this, GetData);
+            ServerApi.Hooks.NetSendData.Register(this, SendData);
+            ServerApi.Hooks.ServerChat.Register(this, OnChat);
             Commands.ChatCommands.Add(new Command("CA.channel.cmd", ChannelCommand, "ch", "channel"));
             Commands.ChatCommands.Add(new Command("CA.ignore.cmd", IgnoreCommand, "ignore"));
 
@@ -142,24 +142,24 @@ namespace ChatAssistant
         {
             if (disposing)
             {
-                NetHooks.GetData -= GetData;
-                NetHooks.SendData -= SendData;
-                ServerHooks.Leave -= OnLeave;
-                ServerHooks.Join -= OnJoin;
-                ServerHooks.Chat -= OnChat;
+                ServerApi.Hooks.ServerJoin.Deregister(this, OnJoin);
+                ServerApi.Hooks.ServerLeave.Deregister(this, OnLeave);
+                ServerApi.Hooks.NetGetData.Deregister(this, GetData);
+                ServerApi.Hooks.NetSendData.Deregister(this, SendData);
+                ServerApi.Hooks.ServerChat.Deregister(this, OnChat);
             }
             base.Dispose(disposing);
         }
-        private static void OnJoin(int who, HandledEventArgs args)
+        private static void OnJoin(JoinEventArgs args)
         {
             try
             {
                 lock (PlayerList)
                 {
-                    PlayerList[who] = new CAPlayer(who);
+                    PlayerList[args.Who] = new CAPlayer(args.Who);
                 }
                 if (Channels[0] != null)
-                    Channels[0].JoinChannel(PlayerList[who]);
+                    Channels[0].JoinChannel(PlayerList[args.Who]);
             }
             catch (Exception ex)
             {
@@ -167,24 +167,24 @@ namespace ChatAssistant
             }
 
         }
-        private static void OnLeave(int who)
+        private static void OnLeave(LeaveEventArgs args)
         {
             try
             {
-                if (who >= 0 && PlayerList[who] != null)
+                if (args.Who >= 0 && PlayerList[args.Who] != null)
                 {
                     lock (PlayerList)
                     {
-                        PlayerList[who].quitting = true;
-                        if (PlayerList[who].InMenu)
-                            PlayerList[who].Menu.Close(true);
-                        if (PlayerList[who].Channel >= 0)
+                        PlayerList[args.Who].quitting = true;
+                        if (PlayerList[args.Who].InMenu)
+                            PlayerList[args.Who].Menu.Close(true);
+                        if (PlayerList[args.Who].Channel >= 0)
                         {
-                            var chan = Channels[PlayerList[who].Channel];
+                            var chan = Channels[PlayerList[args.Who].Channel];
                             if (chan != null)
-                                chan.LeaveChannel(PlayerList[who]);
+                                chan.LeaveChannel(PlayerList[args.Who]);
                         }
-                        PlayerList[who] = null;
+                        PlayerList[args.Who] = null;
                     }
                 }
             }
@@ -288,22 +288,22 @@ namespace ChatAssistant
                 Log.ConsoleError(ex.ToString());
             }
         }
-        void OnChat(messageBuffer buf, int who, string text, HandledEventArgs args)
+        void OnChat(ServerChatEventArgs args)
         {
-            if (text[0] == '/')
+            if (args.Text.StartsWith("/"))
                 return;
-            var player = PlayerList[who];
+            var player = PlayerList[args.Who];
             if (player != null)
             {
                 if (player.InMenu)
                 {
                     if (player.Menu.contents[player.Menu.index].Writable)
-                        player.Menu.OnInput(text);
+                        player.Menu.OnInput(args.Text);
                     args.Handled = true;
                 }
                 else if (!player.TSPlayer.mute && !TShock.Config.EnableChatAboveHeads)
                 {
-                    NetMessage.SendData((int)PacketTypes.ChatText, -1, who, String.Format(TShock.Config.ChatFormat, player.TSPlayer.Group.Name, player.TSPlayer.Group.Prefix, player.TSPlayer.Name, player.TSPlayer.Group.Suffix, text), 255, player.TSPlayer.Group.R, player.TSPlayer.Group.G, player.TSPlayer.Group.B, player.Channel + 2);
+                    NetMessage.SendData((int)PacketTypes.ChatText, -1, args.Who, String.Format(TShock.Config.ChatFormat, player.TSPlayer.Group.Name, player.TSPlayer.Group.Prefix, player.TSPlayer.Name, player.TSPlayer.Group.Suffix, args.Text), 255, player.TSPlayer.Group.R, player.TSPlayer.Group.G, player.TSPlayer.Group.B, player.Channel + 2);
                     args.Handled = true;
                 }
             }
@@ -370,7 +370,7 @@ namespace ChatAssistant
                 return;
             try
             {
-                if (e.MsgID == PacketTypes.ChatText)
+                if (e.MsgId == PacketTypes.ChatText)
                 {
                  //   Log.ConsoleInfo(String.Format("ChatText> 1: {0}, 2: {4}, 3: {5}, 4: {6}, 5: {1}, remote: {2}, ignore: {3}", e.number, e.number5, e.remoteClient, e.ignoreClient, e.number2, e.number3, e.number4));
                     int sender = e.ignoreClient; // -1 = system
@@ -465,7 +465,7 @@ namespace ChatAssistant
                         }
                     }                                        
                 }
-                else if (e.MsgID == PacketTypes.PlayerInfo)
+                else if (e.MsgId == PacketTypes.PlayerInfo)
                 {
                    //  Console.WriteLine(String.Format("PlayerInfo> 1: {0}, 2: {4}, 3: {5}, 4: {6}, 5: {1}, remote: {2}, ignore: {3} text: {7}", e.number, e.number5, e.remoteClient, e.ignoreClient, e.number2, e.number3, e.number4, e.text));
                     if (TShock.Config.EnableChatAboveHeads && e.number5 == 0) //default message
