@@ -57,9 +57,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\tShock References\4.0\serverplugins\TShockAPI.dll</HintPath>
     </Reference>
-    <Reference Include="Vault">
-      <HintPath>..\..\Vault\Vault\bin\Release\Vault.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Channel.cs" />
@@ -72,7 +69,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy "$(ProjectDir)$(OutDir)$(TargetFileName)" "D:\Program Files\Steam\steamapps\common\terraria\ServerPlugins\" /Y</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

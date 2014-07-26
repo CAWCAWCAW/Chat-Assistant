@@ -15,7 +15,7 @@ using Newtonsoft.Json;
 
 namespace ChatAssistant
 {
-    [APIVersion(1, 12)]
+    [APIVersion(1, 16)]
     public class CAMain : TerrariaPlugin
     {        
 
@@ -84,7 +84,7 @@ namespace ChatAssistant
         }
         public override Version Version
         {
-            get { return new Version("0.45"); }
+            get { return new Version("0.46"); }
         }
         public CAMain(Main game)
             : base(game)
@@ -193,27 +193,6 @@ namespace ChatAssistant
                 Log.ConsoleError(ex.ToString());
             }
         }
-        void VaultChCreate(CAPlayer player, int chID, CommandArgs args)
-        {
-            try
-            {
-                if (Vault.Vault.ModifyBalance(args.Player.Name, -config.ChanelCreatingCost))
-                {
-                    var newchannel = new Channel(chID, args.Parameters[0]);
-                    if (args.Parameters.Count > 1)
-                        newchannel.Password = args.Parameters[1];
-                    Channels[chID] = newchannel;
-                    NetMessage.SendData((int)PacketTypes.ChatText, -1, -1, "New channel created", 255, Color.LightSalmon.R, Color.LightSalmon.G, Color.LightSalmon.B, chID + 1);
-                    Channels[chID].JoinChannel(player);
-                }
-                else
-                    args.Player.SendMessage(String.Format("Channel not found and insufficient founds to create a new channel. (costs: {0})", Vault.Vault.MoneyToString(config.ChanelCreatingCost)), Color.LightSalmon);
-            }
-            catch (Exception ex)
-            {
-                Log.ConsoleError(ex.ToString());
-            }
-        }
         void ChannelCommand(CommandArgs args)
         {
             try
@@ -249,18 +228,6 @@ namespace ChatAssistant
                     }
                     if (j != -1) // channel not found
                     {
-                        if (config.UsingVault)
-                        {
-                            try
-                            {
-                                VaultChCreate(player, j, args);
-                            }
-                            catch
-                            {
-                                config.UsingVault = false;
-                            }
-                            return;
-                        }
                         if (args.Player.Group.HasPermission("CA.channel.create")) //create new channel
                         {
                             var newchannel = new Channel(j, args.Parameters[0]);
